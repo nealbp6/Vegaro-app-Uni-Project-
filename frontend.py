@@ -1,20 +1,30 @@
 # frontend.py
 import customtkinter as ctk
-from tkinter import messagebox, Toplevel
-from tkinter.scrolledtext import ScrolledText
-
-from backend import generate_recipe_ai, add_recipe_local, get_saved_recipes, save_recipe_supabase, save_user_profile, save_user_profile_local, fetch_user_profile_local, fetch_user_profile_supabase, recipe_exists_local, recipe_exists_supabase, sync_from_supabase_to_local, USER_CODE
-
+from tkinter import messagebox
+from backend import (
+    generate_recipe_ai,
+    add_recipe_local,
+    get_saved_recipes,
+    save_recipe_supabase,
+    save_user_profile,
+    save_user_profile_local,
+    fetch_user_profile_local,
+    fetch_user_profile_supabase,
+    recipe_exists_local,
+    recipe_exists_supabase,
+    sync_from_supabase_to_local,
+    USER_CODE
+)
 
 ctk.set_appearance_mode("light")
 ctk.set_default_color_theme("green")
 
+
 def fx(size, weight="normal"):
     return ("Arial", size, weight)
 
-# -----------------------------
+
 # MAIN APP
-# -----------------------------
 class VegaroApp(ctk.CTk):
     def __init__(self):
         super().__init__()
@@ -22,19 +32,16 @@ class VegaroApp(ctk.CTk):
         self.geometry("1200x800")
         self.configure(fg_color="#EFEFEF")
 
-        # Attempt to sync from Supabase on startup (non-blocking-ish)
+        # Attempt to sync from Supabase on startup
         try:
-            # Fetch remote profile; if missing, create an empty user row
             profile_remote = fetch_user_profile_supabase()
             if profile_remote is None:
                 save_user_profile("", "")
-            # Merge remote recipes into local cache
             sync_from_supabase_to_local()
         except Exception:
-            # ignore sync errors (RLS / network) — app still works locally
             pass
 
-        # Load local profile (will be overwritten by remote if synced above)
+        # Load local profile
         self.user_profile = fetch_user_profile_local()
 
         self.container = ctk.CTkFrame(self, fg_color="#FFFFFF", corner_radius=20)
@@ -78,9 +85,7 @@ class VegaroApp(ctk.CTk):
             ).grid(row=0, column=i, padx=5, sticky="nsew")
 
 
-# -----------------------------
 # HOME SCREEN
-# -----------------------------
 class HomeScreen(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color="#FFFFFF")
@@ -118,9 +123,7 @@ class HomeScreen(ctk.CTkFrame):
         controller.navbar(self)
 
 
-# -----------------------------
 # RECIPE CREATOR
-# -----------------------------
 class RecipeCreator(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color="#FFFFFF")
@@ -167,58 +170,46 @@ class RecipeCreator(ctk.CTkFrame):
         self.controller.show_frame("RecipeResult")
 
 
-# -----------------------------
 # RECIPE RESULT
-# -----------------------------
 class RecipeResult(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color="#FFFFFF")
         self.controller = controller
 
-        ctk.CTkLabel(self, text="Recipe", font=fx(24, "bold"), text_color="#1B4332").pack(pady=15)
+        ctk.CTkLabel(self, text="Saved Recipes", font=fx(24, "bold"), text_color="#1B4332").pack(pady=15)
 
         self.text = ctk.CTkTextbox(self, corner_radius=12)
         self.text.pack(fill="both", expand=True, padx=40, pady=20)
 
-        ctk.CTkButton(
-            self, text="💾 Save Recipe",
-            font=fx(16, "bold"), height=60,
-            corner_radius=15, fg_color="#52B788", hover_color="#40916C",
-            command=self.save
-        ).pack(pady=10)
-
         controller.navbar(self)
 
-    def update(self, txt):
+    def tkraise(self):
+        super().tkraise()
+        self.refresh()  
+
+    def refresh(self):
         self.text.delete("1.0", "end")
-        self.text.insert("1.0", txt)
-
-    def save(self):
-        txt = self.text.get("1.0", "end").strip()
-        if not txt:
+        recipes = get_saved_recipes()
+        if not recipes:
+            self.text.insert("1.0", "No saved recipes yet.")
             return
 
-        title = txt.split("\n")[0].strip()[:120]
+        for i, r in enumerate(reversed(recipes), 1):
+            self.text.insert("end", f"=== Recipe {i}: {r['title']} ===\n")
+            self.text.insert("end", f"{r['content']}\n\n")
 
-        # check duplicates locally and remotely
-        if recipe_exists_local(title) or recipe_exists_supabase(title):
-            messagebox.showinfo("Exists", "This recipe is already saved.")
-            return
+    def update(self, new_recipe=None):
+        if new_recipe:
+            title = new_recipe.split("\n")[0].strip()[:120]
 
-        # save locally and to supabase (supabase save is resilient to errors)
-        added_local = add_recipe_local(title, txt)
-        saved_remote = save_recipe_supabase(title, txt)
+            if not (recipe_exists_local(title) or recipe_exists_supabase(title)):
+                add_recipe_local(title, new_recipe)
+                save_recipe_supabase(title, new_recipe)
 
-        if added_local or saved_remote:
-            messagebox.showinfo("Saved", "Recipe saved successfully.")
-        else:
-            # if both failed silently, still inform user but indicate local duplicate
-            messagebox.showinfo("Saved", "Recipe saved (or already exists).")
+        self.refresh()
 
 
-# -----------------------------
 # PROFILE TAB
-# -----------------------------
 class PersonalTab(ctk.CTkFrame):
     def __init__(self, parent, controller):
         super().__init__(parent, fg_color="#FFFFFF")
@@ -247,20 +238,15 @@ class PersonalTab(ctk.CTkFrame):
 
     def tkraise(self):
         super().tkraise()
-        self.load_profile()
+        self.load_profile() 
 
     def load_profile(self):
-        # prefer remote profile if available
         try:
             profile_remote = fetch_user_profile_supabase()
         except Exception:
             profile_remote = None
 
-        if profile_remote:
-            profile = profile_remote
-        else:
-            profile = fetch_user_profile_local()
-
+        profile = profile_remote if profile_remote else fetch_user_profile_local()
         self.controller.user_profile.update(profile)
         self.diet_combo.set(profile.get("diet", ""))
         self.allergies_entry.delete(0, "end")
@@ -271,11 +257,10 @@ class PersonalTab(ctk.CTkFrame):
         allergies = self.allergies_entry.get().strip()
         self.controller.user_profile.update({"diet": diet, "allergies": allergies})
 
-        # save local and remote (remote may fail due to RLS)
         save_user_profile_local(diet, allergies)
         remote_res = save_user_profile(diet, allergies)
         if remote_res is None:
-            messagebox.showinfo("Saved (local)", "Profile saved locally. Remote save may have failed (check Supabase RLS).")
+            messagebox.showinfo("Saved (local)", "Profile saved locally. Remote save may have failed.")
         else:
             messagebox.showinfo("Saved", "Profile saved locally and remotely.")
 
