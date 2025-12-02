@@ -97,7 +97,7 @@ Vegaro uses **two tables** in Supabase.
 ```sql
 create table user_profiles (
   id          serial primary key,
-  user_code   varchar not null,
+  user_code   varchar,
   diet        varchar,
   allergies   text,
   updated_at  timestamptz default now()
@@ -111,7 +111,7 @@ create table user_profiles (
 ```sql
 create table recipes (
   id          serial primary key,
-  user_code   varchar not null references user_profiles(user_code) on delete cascade,
+  user_code   varchar,
   title       text,
   content     text,
   created_at  timestamptz default now()
