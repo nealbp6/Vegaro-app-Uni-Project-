@@ -96,11 +96,12 @@ Vegaro uses **two tables** in Supabase.
 
 ```sql
 create table user_profiles (
-  id uuid primary key,
-  diet text,
-  allergies text,
-  updated_at timestamptz default now()
-); 
+  id          serial primary key,
+  user_code   varchar not null,
+  diet        varchar,
+  allergies   text,
+  updated_at  timestamptz default now()
+);
 ```
 
 ### 2️⃣ recipes
@@ -109,15 +110,11 @@ create table user_profiles (
 
 ```sql
 create table recipes (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid references user_profiles(id) on delete cascade,
-  name text,
-  description text,
-  ingredients text,
-  instructions text,
-  difficulty text,
-  time text,
-  created_at timestamptz default now()
+  id          serial primary key,
+  user_code   varchar not null references user_profiles(user_code) on delete cascade,
+  title       text,
+  content     text,
+  created_at  timestamptz default now()
 );
 ```
  
