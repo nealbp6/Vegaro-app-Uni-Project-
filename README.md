@@ -65,7 +65,7 @@ cd vegaro
 # 2️⃣ Install dependencies
 pip install -r requirements.txt
 
-# 4️3️⃣ Run the app
+# 3️⃣ Run the app
 python main.py
 ```
 
@@ -76,6 +76,7 @@ Before running the app, create a `.env` file in the project root:
 ```bash
 SUPABASE_URL=your-supabase-url
 SUPABASE_KEY=your-supabase-service-role-or-anon-key
+GROQ_API_KEY=your-groq-api-key
 USER_ID=your-user-id
 ```
 
@@ -96,12 +97,11 @@ Vegaro uses **two tables** in Supabase.
 
 ```sql
 create table user_profiles (
-  id          serial primary key,
-  user_code   varchar,
-  diet        varchar,
-  allergies   text,
-  updated_at  timestamptz default now()
-);
+  id uuid primary key,
+  diet text,
+  allergies text,
+  updated_at timestamptz default now()
+); 
 ```
 
 ### 2️⃣ recipes
@@ -110,11 +110,15 @@ create table user_profiles (
 
 ```sql
 create table recipes (
-  id          serial primary key,
-  user_code   varchar,
-  title       text,
-  content     text,
-  created_at  timestamptz default now()
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references user_profiles(id) on delete cascade,
+  name text,
+  description text,
+  ingredients text,
+  instructions text,
+  difficulty text,
+  time text,
+  created_at timestamptz default now()
 );
 ```
  
